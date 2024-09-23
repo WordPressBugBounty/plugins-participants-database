@@ -1,0 +1,19 @@
+{
+  "name": "xnau/participants-database",
+  "description": "database plugin for WordPress",
+  "type": "wordpress-plugin",
+  "require": {
+    "deliciousbrains/wp-background-processing": "^1.0",
+    "parsecsv/php-parsecsv": "^1.2",
+    "collizo4sky/persist-admin-notices-dismissal": "^1.4"
+  },
+  "license": "GPL-3.0-or-later",
+  "authors": [
+    {
+      "name": "Roland Barker",
+      "email": "webdesign@xnau.com",
+      "homepage": "https://xnau.com"
+    }
+  ],
+  "minimum-stability": "stable"
+}
