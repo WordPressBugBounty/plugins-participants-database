@@ -4,7 +4,7 @@
  * Plugin URI: https://xnau.com/wordpress-plugins/participants-database
  * Description: Plugin for managing a database of participants, members or volunteers
  * Author: Roland Barker, xnau webdesign
- * Version: 2.5.10
+ * Version: 2.6
  * Author URI: https://xnau.com
  * License: GPL3
  * Text Domain: participants-database
@@ -43,7 +43,7 @@ spl_autoload_register( 'PDb_class_loader' );
  * @author     Roland Barker <webdesign@xnau.com>
  * @copyright  2011 - 2022 7th Veil, LLC
  * @license    http://www.gnu.org/licenses/gpl-2.0.txt GPL2
- * @version    Release: 1.9.8
+ * @version    Release: 2.1
  * 
  */
 class Participants_Db extends PDb_Base {
@@ -311,6 +311,9 @@ class Participants_Db extends PDb_Base {
     // set the WP hooks to finish setting up the plugin
     add_action( 'plugins_loaded', array(__CLASS__, 'setup_source_names'), 1 );
     add_action( 'plugins_loaded', array(__CLASS__, 'init'), 5 );
+    add_action('init', function(){
+      self::load_plugin_textdomain( __FILE__ );
+    });
     add_action( 'wp', array(__CLASS__, 'check_for_shortcode'), 1 );
     add_action( 'wp', array(__CLASS__, 'remove_rel_link') );
 
@@ -386,10 +389,15 @@ class Participants_Db extends PDb_Base {
       return $events;
     });
     
-    // external custom template location plugin no longer needed, deactivate it
-    deactivate_plugins( 'pdb-custom-templates.php', true );
+    if ( ! function_exists( 'deactivate_plugins' ) ) {
+      include_once ABSPATH . '/wp-admin/includes/plugin.php';
+    }
     
     add_action('wp_loaded', function(){ 
+      
+      // external custom template location plugin no longer needed, deactivate it
+      deactivate_plugins( 'pdb-custom-templates.php', true );
+      
       if ( isset(Participants_Db::$plugin_options['enable_api']) && Participants_Db::$plugin_options['enable_api'] )
       {
         new \PDb_submission\rest_api\routing();
@@ -574,8 +582,6 @@ class Participants_Db extends PDb_Base {
      */
     new \PDb_import\controller();
 
-    self::load_plugin_textdomain( __FILE__ );
-
     self::$plugin_title = self::apply_filters( 'plugin_title', __( 'Participants Database', 'participants-database' ) );
 
     self::_set_i18n();
@@ -613,6 +619,8 @@ class Participants_Db extends PDb_Base {
             "Content-Type: " . $type . "\n";
 
     self::$email_headers = self::apply_filters( 'email_headers', $email_headers );
+    
+    new \PDb_shortcodes\search_return_link();
 
     /**
      * any plugins that require Participants Database settings/database should use this hook
@@ -1173,7 +1181,7 @@ class Participants_Db extends PDb_Base {
       
       $sql = 'SELECT v.name, v.*, g.title AS grouptitle, g.id AS groupid, g.mode  
               FROM ' . Participants_Db::$fields_table . ' v 
-                JOIN ' . Participants_Db::$groups_table . ' g
+                INNER JOIN ' . Participants_Db::$groups_table . ' g
                   ON v.group = g.name 
               ORDER BY v.order';
       $field_defs = $wpdb->get_results( $sql, OBJECT_K );
@@ -1991,31 +1999,52 @@ class Participants_Db extends PDb_Base {
   }
 
   /**
-   * returns the next valid record id
+   * returns the next valid record id from the results of the admin list filter
    * 
    * the next id can be the next higher or lower. This function will wrap, so it 
    * always returns a valid id.
    * 
-   * @global object $wpdb
+   * @global \wpdb $wpdb
    * @param string $id the current id
    * @param bool   $increment true for next higher, false for next lower
    * @return string the next valid id
    */
   public static function next_id( $id, $increment = true )
   {
-    global $wpdb;
-    $max = $wpdb->get_var( 'SELECT MAX(p.id) FROM ' . self::$participants_table . ' p' );
-    $id = (int) $id;
-    $inc = $increment ? 1 : -1;
-    $id = $id + $inc;
-    while ( !self::_id_exists( $id ) ) {
-      $id = $id + $inc;
-      if ( $id > $max )
-        $id = 1;
-      elseif ( $id < 1 )
-        $id = $max;
+    $i = $increment ? 1 : -1;
+    
+    $query = get_transient( PDb_admin_list\query::query_store );
+    
+    if ( $query ) // get the ID from the last list filter
+    {
+      $result_list = PDb_admin_list\query::result_list( $query );
+
+      $index = array_search( $id, $result_list );
+      
+      $next_i = $index + $i;
+      
+      if ( ! array_key_exists( $next_i, $result_list ) )
+      {
+        $next_i = $i === 1 ? array_key_first( $result_list ) : array_key_last( $result_list );
+      }
+
+      return $result_list[ $next_i ];
     }
-    return $id;
+    else // get it from the full ID list
+    {
+      global $wpdb;
+      $max = $wpdb->get_var( 'SELECT MAX(p.id) FROM ' . self::$participants_table . ' p' );
+      $id = (int) $id;
+      $id = $id + $i;
+      while ( !self::_id_exists( $id ) ) {
+        $id = $id + $i;
+        if ( $id > $max )
+          $id = 1;
+        elseif ( $id < 1 )
+          $id = $max;
+      }
+      return $id;
+    }
   }
 
   /**
@@ -3148,7 +3177,7 @@ class Participants_Db extends PDb_Base {
       return;
     }
     
-    if ( isset( $shortcode_atts['header_sort'] ) && $shortcode_atts['header_sort'] == 'true' )
+    if ( isset( $shortcode_atts['header_sort'] ) && $shortcode_atts['header_sort'] === 'true' )
     {
       new PDb_shortcodes\sort_headers();
     }
@@ -3158,10 +3187,8 @@ class Participants_Db extends PDb_Base {
     $shortcode_atts['module'] = 'list';
 
     // output the filtered shortcode content
-    header( "Content-Type:	text/html" );
-    
-    
     echo wp_kses( PDb_List::get_list( $shortcode_atts ), Participants_Db::allowed_html('form') );
+    
     return;
   }
 
@@ -3441,21 +3468,55 @@ class Participants_Db extends PDb_Base {
     ) );
     return isset( $labels[$key] ) ? $labels[$key] : $key;
   }
+  
+  /**
+   * provides the plugin's data array
+   * 
+   * @param string $plugin_file path tp the plugin file
+   * @return array
+   */
+  public static function get_plugin_data( $plugin_file = '' )
+  {
+    return self::_get_all_plugin_data( $plugin_file );
+  }
 
   /**
    * parses the text header to extract plugin info
    * 
+   * @param string $plugin_file path to the main plugin file
+   * @return array of plugin header values
+   */
+  private static function _get_all_plugin_data( $plugin_file = '' )
+  {
+    if ( $plugin_file === '' )
+    {
+      $plugin_file = __FILE__;
+    }
+    
+    $default_headers = [
+      'Name' => 'Plugin Name',
+      'PluginURI' => 'Plugin URI',
+      'Version' => 'Version',
+      'Description' => 'Description',
+      'Author' => 'Author',
+      'AuthorURI' => 'Author URI',
+      'TextDomain' => 'Text Domain',
+      'DomainPath' => 'Domain Path',
+      'Network' => 'Network',
+    ];
+    
+    return get_file_data( $plugin_file, $default_headers, 'plugin');
+  }
+  
+
+  /**
+   * provides a single value from the plugin file header
+   * 
    * @param string $key the name of the field to get
    */
-  private static function _get_plugin_data( $key = 'Name' )
+  private static function _get_plugin_data( $key )
   {
-    if ( ! function_exists( 'get_plugin_data' ) ) {
-      include_once ABSPATH . '/wp-admin/includes/plugin.php';
-    }
-
-    $plugin_data = get_plugin_data( __FILE__ );
-
-    return $plugin_data[$key];
+    return self::_get_all_plugin_data()[$key];
   }
   
   /**

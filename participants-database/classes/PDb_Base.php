@@ -469,6 +469,8 @@ return $field->name() === $fieldname;
     if ( is_array( $field_list ) ) {
       return $field_list;
     }
+    
+    $field_list = [];
 
     foreach ( self::field_defs() as $fieldname => $field ) {
       if ( $field->stores_data() ) {
@@ -998,6 +1000,12 @@ return $field->name() === $fieldname;
     if ( ! self::is_serialized_array( $string ) ) // make sure it is a serialized array with no objects
     {
       return $return_array ? (array) $string : $string;
+    }
+    
+    // this is to fix serializations that come in with single quotes enclosing the values
+    if ( preg_match( "/(:'.+';)/", $string ) === 1 )
+    {
+      $string = str_replace( [":'","';"], [':"','";'], $string );
     }
     
     return maybe_unserialize( $string );

@@ -128,7 +128,7 @@ abstract class WP_Background_Process extends WP_Async_Request {
 	 * @return $this
 	 */
 	public function delete( $key ) {
-		delete_site_option( $key );
+    delete_site_option( $key );
 
 		return $this;
 	}

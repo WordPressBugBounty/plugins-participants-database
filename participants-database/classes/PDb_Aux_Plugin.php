@@ -278,7 +278,8 @@ if ( !class_exists( 'PDb_Aux_Plugin' ) ) :
      */
     public function set_plugin_options()
     {
-      $this->plugin_data = ( function_exists( 'get_plugin_data' ) ? get_plugin_data( $this->plugin_path ) : array('Author' => 'Roland Barker, xnau webdesign') ) + $this->plugin_data;
+//       $this->plugin_data = ( function_exists( 'get_plugin_data' ) ? Participants_Db::get_plugin_data( $this->plugin_path ) : array('Author' => 'Roland Barker, xnau webdesign') ) + $this->plugin_data;
+      $this->plugin_data =  ['Author' => 'Roland Barker, xnau webdesign'] + Participants_Db::get_plugin_data( $this->plugin_path );
       $this->set_attribution();
       $this->register_option_for_translations();
       /*
@@ -351,7 +352,6 @@ if ( !class_exists( 'PDb_Aux_Plugin' ) ) :
      */
     public function add_plugin_meta_links( $links, $file )
     {
-
       $plugin = plugin_basename( $this->plugin_path );
 
       // create link
@@ -361,7 +361,10 @@ if ( !class_exists( 'PDb_Aux_Plugin' ) ) :
 //        if ( !empty( $this->plugin_data['PluginURI'] ) ) {
 //          $links[] = '<a href="' . $this->plugin_data['PluginURI'] . '">' . __( 'Submit a rating or review', 'participants-database' ) . ' </a>';
 //        }
-        $links[] = '<a href="' . $this->plugin_data['SupportURI'] . '">' . __( 'Support', 'participants-database' ) . ' </a>';
+        if ( isset( $this->plugin_data['SupportURI'] ) )
+        {
+          $links[] = '<a href="' . $this->plugin_data['SupportURI'] . '">' . __( 'Support', 'participants-database' ) . ' </a>';
+        }
       }
       return $links;
     }
