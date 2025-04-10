@@ -94,7 +94,7 @@ abstract class calculated_field extends dynamic_db_field {
    * @return bool
    */
   abstract protected function is_numeric_field();
-
+  
   /**
    * display the field value in a read context
    * 
@@ -405,8 +405,11 @@ abstract class calculated_field extends dynamic_db_field {
     
     foreach( $this->template->field_list() as $fieldname )
     {
-      if( \PDb_Form_Field_Def::is_field( $fieldname ) ) {
-        $list[] = $fieldname;
+      $test_fieldname = str_replace( ['value:'],'',$fieldname);
+      
+      if( $this->is_valid_field( $test_fieldname ) ) 
+      {
+        $list[] = $test_fieldname;
       }
     }
     

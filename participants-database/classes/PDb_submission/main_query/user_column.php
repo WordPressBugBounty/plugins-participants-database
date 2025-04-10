@@ -70,7 +70,7 @@ class user_column extends base_column {
         } 
         else 
         {
-          if ( $this->is_serialization( $initialvalue[1] ) )
+          if ( isset( $initialvalue[1] ) && $this->is_serialization( $initialvalue[1] ) )
           {
             $initialvalue[1] = '';
           }
@@ -93,12 +93,16 @@ class user_column extends base_column {
       case 'date':
       case 'date5':
 
-        if ( $initialvalue !== '' && !is_null( $initialvalue ) ) {
-
+        if ( $initialvalue !== '' && !is_null( $initialvalue ) ) 
+        {
           $this->value = PDb_Date_Parse::timestamp( $initialvalue, array(), __METHOD__ . ' date field value' );
-        } elseif ( is_null( $initialvalue ) ) {
+        } 
+        elseif ( is_null( $initialvalue ) ) 
+        {
           $this->value = null;
-        } else {
+        } 
+        else 
+        {
           $this->skip = true;
         }
         break;
@@ -187,29 +191,16 @@ class user_column extends base_column {
           }
         }
         break;
+        
+      case 'string-combine':
+        
+        // unencode ampersands #3149
+        $this->value = str_replace( ['&amp;'], ['&'], $this->general_sanitize( $initialvalue, false ) );
+        break;
 
       default:
         
-        // sanitize out serializations
-        if ( $this->is_serialization(  $initialvalue ) )
-        {
-          $initialvalue = '';
-        }
-
-        if ( is_null( $initialvalue ) )
-        {
-          $this->value = null;
-        } 
-        elseif ( is_array( $initialvalue ) )
-        {
-          $this->value = Participants_Db::_prepare_array_mysql( $initialvalue );
-        }
-        else
-        {
-          $value = \Participants_Db::field_html_is_allowed( $this->field->name() ) ? wp_kses( trim( $initialvalue ), \Participants_Db::allowed_html( 'post' ) ) : strip_tags( trim( $initialvalue ) );
-          
-          $this->value = Participants_Db::_prepare_string_mysql( $value );
-        }
+        $this->value = $this->general_sanitize( $initialvalue );
     }
   }
 

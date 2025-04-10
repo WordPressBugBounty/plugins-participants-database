@@ -9,7 +9,7 @@
  * @author     Roland Barker <webdesign@xnau.com>
  * @copyright  2015 xnau webdesign
  * @license    GPL2
- * @version    1.6
+ * @version    1.7
  * @link       http://xnau.com/wordpress-plugins/
  * 
  */
@@ -58,24 +58,25 @@ class PDb_Record extends PDb_Shortcode {
     // set the action URI for the form
     $this->_set_submission_page();
 
-    if ( false === $this->shortcode_atts['record_id'] ) {
-
+    if ( false === $this->shortcode_atts['record_id'] ) 
+    {
       $this->participant_values = array();
       $this->_not_found();
-    } else {
-
+    } 
+    else 
+    {
       $this->participant_id = $this->shortcode_atts['record_id'];
 
       $record_values = Participants_Db::get_participant( $this->participant_id );
 
-      if ( $record_values === false ) {
-        
+      if ( $record_values === false ) 
+      {  
         // the ID is not valid
         $this->participant_id = 0;
-        $this->_not_found();
-        
-      } else {
-
+        $this->_not_found();   
+      } 
+      else 
+      {
         // drop in any default values 
         $this->participant_values = array_merge(
                 array_filter( Participants_Db::get_default_record(), 'Participants_Db::is_set_value' ),
@@ -116,7 +117,7 @@ class PDb_Record extends PDb_Shortcode {
    */
   public static function print_form( $params )
   {
-    $record = new PDB_Record( $params );
+    $record = new self( $params );
 
     return $record->output;
   }
@@ -150,6 +151,21 @@ class PDb_Record extends PDb_Shortcode {
   protected function _include_template()
   {
     include $this->template;
+  }
+  
+  /**
+   * sets up the hidden fields for the record form
+   */
+  protected function _setup_hidden_fields()
+  {
+    parent::_setup_hidden_fields();
+    
+    /**
+     * @filter pdb-record_form_hidden_fields
+     * @param array as $fieldname => $value
+     * @return array
+     */
+    $this->hidden_fields = Participants_Db::apply_filters( 'record_form_hidden_fields', $this->hidden_fields );
   }
 
   /**
@@ -226,11 +242,12 @@ class PDb_Record extends PDb_Shortcode {
    */
   protected function _not_found()
   {
-    if ( Participants_Db::plugin_setting_is_true( 'no_record_use_template' ) || version_compare( $this->template_version, '0.2', '<' ) ) {
-
+    if ( Participants_Db::plugin_setting_is_true( 'no_record_use_template' ) || version_compare( $this->template_version, '0.2', '<' ) ) 
+    {
       $this->_print_from_template();
-    } else {
-
+    } 
+    else 
+    {
       $error_message = Participants_Db::plugin_setting( 'no_record_error_message' );
       $this->output = empty( $error_message ) ? '' : '<p class="alert alert-error">' . $error_message . '</p>';
     }

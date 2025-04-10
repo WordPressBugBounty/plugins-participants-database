@@ -136,9 +136,10 @@ class PDb_Base {
    * 
    * @param array $post associative array of data to store
    * @param int $id the record id to update, creates new record if omitted
+   * @param string $context optional label
    * @return  int the ID of the record added or updated
    */
-  public static function write_participant( Array $post, $id = '' )
+  public static function write_participant( Array $post, $id = '', $context = '' )
   {
     $action = 'update';
 
@@ -149,7 +150,7 @@ class PDb_Base {
       $id = false;
     }
 
-    return Participants_Db::process_form( $post, $action, $id, array_keys( $post ), true );
+    return Participants_Db::process_form( $post, $action, $id, array_keys( $post ), true, $context );
   }
 
   /**
@@ -424,7 +425,7 @@ class PDb_Base {
       $post = array_diff_assoc( $updated_record, $record );
 
       if ( !empty( $post ) ) {
-        Participants_Db::write_participant( $post, $record[ 'id' ] );
+        Participants_Db::write_participant( $post, $record[ 'id' ], 'dynamic db field update' );
 
         $tally++;
       }
@@ -581,18 +582,26 @@ return $field->name() === $fieldname;
   public static function record_match_id( $columns, $submission )
   {
     global $wpdb;
-    $values = array();
-    $where = array();
+    $values = [];
+    $where = [];
+    
     $columns = is_array( $columns ) ? $columns : explode( ',', str_replace( ' ', '', $columns ) );
-    foreach ( $columns as $column ) {
-      if ( isset( $submission[ $column ] ) ) {
+    
+    foreach ( $columns as $column ) 
+    {
+      if ( isset( $submission[ $column ] ) ) 
+      {
         $values[] = $submission[ $column ];
         $where[] = ' r.' . $column . ' = %s';
-      } else {
+      } 
+      else 
+      {
         $where[] = ' (r.' . $column . ' IS NULL OR r.' . $column . ' = "")';
       }
     }
+    
     $sql = 'SELECT r.id FROM ' . Participants_Db::$participants_table . ' r WHERE ' . implode( ' AND ', $where );
+    
     $match = $wpdb->get_var( $wpdb->prepare( $sql, $values ) );
 
     return is_numeric( $match ) ? (int) $match : false;
@@ -612,19 +621,31 @@ return $field->name() === $fieldname;
   {
     $permalink = false;
     $id = false;
-    if ( filter_var( $page, FILTER_VALIDATE_URL ) ) {
+    
+    if ( filter_var( $page, FILTER_VALIDATE_URL ) )
+    {
       $permalink = $page;
-    } elseif ( preg_match( '#^[0-9]+$#', $page ) ) {
+    } 
+    elseif ( preg_match( '#^[0-9]+$#', $page ) ) 
+    {
       $id = $page;
-    } elseif ( $post = get_page_by_path( $page ) ) {
+    } 
+    elseif ( $post = get_page_by_path( $page ) ) 
+    {
       $id = $post->ID;
-    } else {
+    } 
+    else 
+    {
       // get the ID by the post slug
       global $wpdb;
       $id = $wpdb->get_var( $wpdb->prepare( "SELECT p.ID FROM $wpdb->posts p WHERE p.post_name = '%s' AND p.post_status = 'publish'", trim( $page, '/ ' ) ) );
     }
+    
     if ( $id )
+    {
       $permalink = self::get_permalink( $id );
+    }
+    
     return $permalink;
   }
 
@@ -658,7 +679,7 @@ return $field->name() === $fieldname;
    */
   public static function string_sanitize( $flags = FILTER_FLAG_NONE )
   {
-    return array( 'flags' => FILTER_FLAG_STRIP_BACKTICK | FILTER_FLAG_ENCODE_LOW | $flags );
+    return [ 'flags' => FILTER_FLAG_STRIP_BACKTICK | FILTER_FLAG_ENCODE_LOW | $flags ];
   }
 
   /**
@@ -674,97 +695,98 @@ return $field->name() === $fieldname;
     $all_allowed = wp_cache_get( $cachekey, $type );
 
     if ( !$all_allowed ) {
-      $base_attributes = array(
+      $base_attributes = [
           'id' => 1,
           'class' => 1,
           'style' => 1,
           'data-*' => 1,
-      );
+      ];
 
       if ( Participants_Db::plugin_setting_is_true( 'allow_js_atts', false ) ) {
         $base_attributes = $base_attributes + self::js_attributes();
       }
 
-      $allowed = array(
-          'a' => array(
-      'href' => 1,
-      'title' => 1,
-      'target' => 1,
-      'rel' => 1,
-          ) + $base_attributes,
-          'break' => array(),
-          'br' => array(),
-          'style' => array(),
-      );
-      $additional = array();
+      $allowed = [
+          'a' => [
+            'href' => 1,
+            'title' => 1,
+            'target' => 1,
+            'rel' => 1,
+          ] + $base_attributes,
+          'break' => [],
+          'br' => [],
+          'style' => [],
+      ];
+      $additional = [];
 
-      $form_allowed = array(
-          'form' => array(
-      'method' => 1,
-      'enctype' => 1,
-      'action' => 1,
-          ) + $base_attributes,
-          'input' => array(
-      'name' => 1,
-      'type' => 1,
-      'value' => 1,
-      'title' => 1,
-      'checked' => 1,
-      'size' => 1,
-      'max' => 1,
-      'maxlength' => 1,
-      'min' => 1,
-      'minlength' => 1,
-      'alt' => 1,
-      'accept' => 1,
-      'step' => 1,
-      'disabled' => 1,
-      'pattern' => 1,
-      'placeholder' => 1,
-      'readonly' => 1,
-      'required' => 1,
-          ) + $base_attributes,
-          'select' => array(
-      'name' => 1,
-      'multiple' => 1,
-      'disabled' => 1,
-      'required' => 1,
-          ) + $base_attributes,
-          'option' => array(
-      'value' => 1,
-      'selected' => 1,
-      'disabled' => 1,
-      'label' => 1,
-          ) + $base_attributes,
-          'textarea' => array(
-      'name' => 1,
-      'rows' => 1,
-      'cols' => 1,
-      'title' => 1,
-      'maxlength' => 1,
-      'minlength' => 1,
-      'placeholder' => 1,
-      'readonly' => 1,
-      'required' => 1,
-          ) + $base_attributes,
-          'optgroup' => array(
+      $form_allowed = [
+          'form' => [
+            'method' => 1,
+            'enctype' => 1,
+            'action' => 1,
+          ] + $base_attributes,
+          'input' => [
+            'name' => 1,
+            'type' => 1,
+            'value' => 1,
+            'title' => 1,
+            'checked' => 1,
+            'size' => 1,
+            'max' => 1,
+            'maxlength' => 1,
+            'min' => 1,
+            'minlength' => 1,
+            'alt' => 1,
+            'accept' => 1,
+            'step' => 1,
+            'disabled' => 1,
+            'pattern' => 1,
+            'placeholder' => 1,
+            'readonly' => 1,
+            'required' => 1,
+          ] + $base_attributes,
+          'select' => [
+            'name' => 1,
+            'multiple' => 1,
+            'disabled' => 1,
+            'required' => 1,
+          ] + $base_attributes,
+          'option' => [
+            'value' => 1,
+            'selected' => 1,
+            'disabled' => 1,
+            'label' => 1,
+          ] + $base_attributes,
+          'textarea' => [
+            'name' => 1,
+            'rows' => 1,
+            'cols' => 1,
+            'title' => 1,
+            'maxlength' => 1,
+            'minlength' => 1,
+            'placeholder' => 1,
+            'readonly' => 1,
+            'required' => 1,
+          ] + $base_attributes,
+          'optgroup' => [
               'label' => 1,
               'disabled' => 1,
-          ),
-          'label' => array(
-      'title' => 1,
-          ) + $base_attributes,
-          'fieldset' => array(
-      'disabled' => 1,
-      'form' => 1,
-      'name' => 1,
-          ) + $base_attributes,
-          'output' => array(
+          ],
+          'label' => [
+            'title' => 1,
+              'for' => 1,
+          ] + $base_attributes,
+          'fieldset' => [
+            'disabled' => 1,
+            'form' => 1,
+            'name' => 1,
+          ] + $base_attributes,
+          'output' => [
               'for' => 1,
               'form' => 1,
               'name' => 1,
-          ),
-      );
+          ],
+      ];
 
       switch ( $type ) {
         case 'form':
@@ -1454,7 +1476,7 @@ return $field->name() === $fieldname;
   {
     $textdomain = empty( $textdomain ) ? Participants_Db::PLUGIN_NAME : $textdomain;
 
-    load_plugin_textdomain( $textdomain, false, dirname( plugin_basename( $path ) ) . '/languages' );
+   load_plugin_textdomain( $textdomain, false, dirname( plugin_basename( $path ) ) . '/languages' );
   }
 
   /**
@@ -2769,6 +2791,41 @@ return $field->name() === $fieldname;
     $href = 'https://xnau.com/participants-database-settings-help/';
     return '&nbsp;<a class="settings-help-icon" href="' . $href . '#' . $anchor . '" target="_blank"><span class="dashicons dashicons-editor-help"></span></a>';
   }
+  
+  
+ 
+/**
+ * Returns formatted string as 01:20:15 000
+ *
+ * @param float $seconds seconds
+ * @return string
+ */
+public static function format_seconds( $seconds ) 
+{
+    $timegroups      = array('miliseconds' => 0, 'seconds' => 0, 'minutes' => 0, 'hours' => 0);
+    $interval    = $seconds * 1000; // gives us the number of microseconds
+ 
+    $grouplengths       = array(
+        'hours'         => 60*60*1000,
+        'minutes'       => 60*1000,
+        'seconds'       => 1000,
+        'miliseconds'   => 1
+    );
+ 
+    foreach ($grouplengths as $group => $mS) 
+    {
+      $timegroups[$group] = floor($interval / $mS);
+      $interval = intval( $interval ) % $mS;
+    }
+ 
+    return sprintf(
+        '%02d:%02d:%02d %03d',
+        $timegroups['hours'],
+        $timegroups['minutes'],
+        $timegroups['seconds'],
+        $timegroups['miliseconds']
+    );
+}
 
   /**
    * gets the ID of a page given it's slug

@@ -147,6 +147,20 @@ abstract class dynamic_db_field extends core {
      */
     return \Participants_Db::apply_filters('dynamic_db_internal_field_object',  $field_obj, $data  );
   }
+  
+  /**
+   * tells if a field in the template is valid
+   * 
+   * avoids checking for a Participant Log field if that plugin is disabled
+   * 
+   * @param string $fieldname
+   * @return bool true if the field is valid
+   */
+  protected function is_valid_field( $fieldname )
+  {
+    $log_active = in_array('pdb-participant_log/participant_log.php', apply_filters('active_plugins', get_option('active_plugins')));
+    return \PDb_Form_Field_Def::is_field( $fieldname, !$log_active );
+  }
 
   /**
    * gets the dynamic db field list for the type
@@ -572,16 +586,38 @@ abstract class dynamic_db_field extends core {
       $data[ $dynamic_db_field->name() ] = $this->dynamic_value( $post );
     }
     
-    $data['csv_file_upload'] = 1;
+    $match_prefs['csv_file_upload'] = 1;
     
-    add_filter( 'pdb-needs_date_updated_timestamp', function( $needs, $query ) {
+    add_filter( 'pdb-needs_date_updated_timestamp', function( $needs, $query ) 
+    {  
       /** @var \PDb_submission\main_query\base_query $query */
-      return false;
+      return $query->context() !== 'update dynamic db field on import';
     }, 10, 2 );
     
-    if ( count( $data ) ) {
-      \Participants_Db::write_participant( array_merge( $data, $match_prefs ), $record_id );
+    if ( $this->do_write($data) ) 
+    {
+      \Participants_Db::write_participant( array_merge( $data, $match_prefs ), $record_id, 'update dynamic db field on import' );
     }
+  }
+  
+  /**
+   * tells if the data has valid values to add to the query
+   * 
+   * @param array $data
+   * @return bool true if we have valid data
+   */
+  protected function do_write( $data )
+  {
+    if ( apply_filters( 'pdb-allow_imported_empty_value_overwrite', 0 ) )
+    {
+      return true;
+    }
+    
+    $data_check = array_filter($data, function($v){
+      return ! is_null( $v ) && $v !== '';
+    });
+    
+    return count( $data_check ) > 0;
   }
 
   /**

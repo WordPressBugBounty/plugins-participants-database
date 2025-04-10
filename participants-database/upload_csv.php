@@ -109,7 +109,7 @@ echo str_repeat( '<td>&nbsp;</td>', $column_count );
           <form enctype="multipart/form-data" action="<?php esc_attr_e( $_SERVER["REQUEST_URI"] ) ?>" method="POST">
 <?php wp_nonce_field( PDb_CSV_Import::nonce ) ?>
             <input type="hidden" name="csv_file_upload" id="file_upload" value="true" />
-            <fieldset class="widefat inline-controls">
+            <fieldset class="widefat inline-controls settings-row">
               <p>
                 <label>
 <?php _e( 'Enclosure character', 'participants-database' ); ?>
@@ -147,6 +147,27 @@ PDb_FormElement::print_element( $parameters );
 PDb_FormElement::print_element( $parameters );
 ?>
                 </label>
+                
+                
+                                <label>
+<?php echo __( 'Allow blank value overwrite', 'participants-database' ) . ':'; ?>
+<?php $parameters = array(
+    'type' => 'checkbox',
+    'name' => 'blank_overwrite',
+    'value' => $csv_params['blank_overwrite'],
+    'options' => [1,0],
+);
+PDb_FormElement::print_element( $parameters );
+echo $CSV_import->help_link( 'overwriting' );
+?>
+                </label>
+                
+                
+                
+                
+                
+                
+                
               </p>
             </fieldset>
 
@@ -154,7 +175,7 @@ PDb_FormElement::print_element( $parameters );
               <p>
                 <label>
 <?php
-esc_html_e( 'Duplicate Record Preference', 'participants-database' ) . ': ';
+echo __( 'Duplicate Record Preference', 'participants-database' ) . ': ';
 $parameters = array(
     'type' => 'dropdown',
     'name' => 'match_preference',
@@ -200,8 +221,16 @@ foreach ( $preferences as $i => $preference ) {
 ?></h4>
 
 
-<?php _e( 'Choose .csv file to import:', 'participants-database' ) ?> <input name="<?php esc_attr_e( PDb_CSV_Import::csv_field ) ?>" type="file" /><br />
-<input type="submit" class="button button-primary" value="<?php esc_attr_e( 'Upload File', 'participants-database' ) ?>" />
+<?php _e( 'Choose .csv file to import:', 'participants-database' ) ?> <input name="<?php esc_attr_e( PDb_CSV_Import::csv_field ) ?>" type="file" />
+<p><input type="submit" id="csv-upload-submit" class="button button-primary" value="<?php esc_attr_e( 'Upload File', 'participants-database' ) ?>" />&emsp;
+  <?php if (Participants_Db::plugin_setting_is_true( 'background_import', true ) )
+  {
+    _e('Records will be imported in the background. You may leave this page and come back, the import will continue.','participants-database');
+  } else {
+    _e('Records will be imported as the file is uploaded, this may take some time if the file is large.', 'participants-database');
+    echo '<span class="csv-import-spinner">' . Participants_Db::get_loading_spinner() . '</span>';
+  } ?>
+</p>
           </form>
         </div>
       </div>
@@ -236,8 +265,9 @@ foreach ( $preferences as $i => $preference ) {
       run : function () {
         prefs = $('#match-preferences');
         matchfield = prefs.find('.match-field');
-        $('#pdb-match_preference').change(set_pref);
-        $('#pdb-match_field').change(set_match_field);
+        $('[id^="pdb-match_preference"]').change(set_pref);
+        $('[id^="pdb-match_field"]').change(set_match_field);
+        $('#csv-upload-submit').on('click', () => $('.csv-import-spinner .ajax-loading').css('visibility', 'visible'));
       }
     }
   }(jQuery));
@@ -246,3 +276,39 @@ foreach ( $preferences as $i => $preference ) {
     UploadCSV.run();
   });
 </script>
+<style>
+  .csv-import-spinner .ajax-loading {
+    visibility: hidden;
+    display: inline-block;
+    vertical-align: middle;
+  }
+  .csv-import-spinner {
+    margin-left: 1em;
+  }
+  progress {
+    -webkit-appearance:none;
+    -moz-appearance:none;        
+    appearance: none;
+    border-radius: 3px;
+    border: 1px solid #1d232733;
+    width: 100%;
+  }
+  progress::-webkit-progress-value,
+  progress::-moz-progress-bar{
+    background-color: #2271b1;
+  }
+  progress.complete::-webkit-progress-value,
+  progress.complete::-moz-progress-bar{
+    background-color: #00a32a;
+  }
+  progress::-webkit-progress-value,
+  progress::-webkit-progress-bar {
+    border-radius: 3px;
+  }
+  #message .progressbar {
+    position: relative;
+  }
+  #message .dashicons.dashicons-flag {
+    color: #00a32a;
+  }
+</style>

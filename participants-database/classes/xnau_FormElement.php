@@ -33,7 +33,7 @@
  * @author     Roland Barker <webdesign@xnau.com>
  * @copyright  2011, 2012, 2013, 2014, 2015 xnau webdesign
  * @license    GPL2
- * @version    1.6
+ * @version    1.7
  * @link       http://wordpress.org/extend/plugins/participants-database/
  *
  */
@@ -748,18 +748,21 @@ backtrace: '.print_r( wp_debug_backtrace_summary(),1));
    */
   protected function _dropdown( $other = false )
   {
-    if ( isset( $this->attributes[ 'other' ] ) ) {
+    if ( isset( $this->attributes[ 'other' ] ) ) 
+    {
       $otherlabel = $this->attributes[ 'other' ];
       unset( $this->attributes[ 'other' ] );
-    } else {
+    } 
+    else 
+    {
       $otherlabel = $this->i18n[ 'other' ];
     }
 
     // set the ID for the select element
     $id = $this->element_id();
 
-    if ( !isset( $this->attributes[ 'readonly' ] ) ) {
-
+    if ( !isset( $this->attributes[ 'readonly' ] ) ) 
+    {
       // make a unique prefix for the js function
       $js_prefix = $this->_prep_js_string( $this->name );
 
@@ -802,13 +805,17 @@ backtrace: '.print_r( wp_debug_backtrace_summary(),1));
         $this->_addline( '<input type="text" name="' . $this->name . '" value="' . ( $is_other && ! self::is_empty( $this->value ) ? htmlspecialchars( $this->value, ENT_QUOTES, 'UTF-8', false ) : '' ) . '" ' . $this->_attributes( 'no validate' ) . $this->_class( 'otherfield' ) . ' >' );
         $this->_addline( '</div>' );
       }
-    } else {
-
+    } 
+    else 
+    {
       // readonly display
       $this->attributes[ 'id' ] = $this->element_id() . '_readonly';
-      $options = $this->_make_assoc( $this->options );
+      $options = $this->make_assoc( $this->options );
+      
+      $option_value = array_search( $this->value, $options );
+      $display_value = $other && $option_value === false ? $this->value : $option_value;
 
-      $this->_addline( '<input type="text" name="' . $this->name . '" value="' . array_search( $this->value, $options ) . '" ' . $this->_attributes( 'no validate' ) . $this->_class( 'pdb-readonly' ) . ' >' );
+      $this->_addline( '<input type="text" name="' . $this->name . '" value="' . $display_value . '" ' . $this->_attributes( 'no validate' ) . $this->_class( 'pdb-readonly' ) . ' >' );
     }
   }
 
@@ -885,6 +892,7 @@ backtrace: '.print_r( wp_debug_backtrace_summary(),1));
       $otherlabel = array_search( 'other', $this->options );
       unset( $this->options[ $otherlabel ] );
     }
+    
     if ( isset( $this->attributes[ 'other' ] ) ) {
       $otherlabel = $this->attributes[ 'other' ];
       unset( $this->attributes[ 'other' ] );
@@ -893,7 +901,7 @@ backtrace: '.print_r( wp_debug_backtrace_summary(),1));
     // make a unique prefix for the function
     $js_prefix = $this->_prep_js_string( $this->name )/* .'_' */;
 
-    // put it in a conatiner
+    // put it in a container
     $this->_addline( '<div class="selectother ' . $type . '-other-control-group"' . ( $this->container_id ? ' id="' . $this->container_id . '"' : '' ) . ' >' );
     $this->indent++;
 
@@ -1216,7 +1224,7 @@ backtrace: '.print_r( wp_debug_backtrace_summary(),1));
 
     $optgroup = false;
 
-    foreach ( $this->_make_assoc( $this->options ) as $option_key => $option_value ) {
+    foreach ( $this->make_assoc( $this->options ) as $option_key => $option_value ) {
 
       if ( ($option_value === false || $option_value === 'false' || $option_value === 'optgroup') && ! self::is_empty( $option_key ) ) 
       {
@@ -1307,7 +1315,7 @@ backtrace: '.print_r( wp_debug_backtrace_summary(),1));
     
     $has_option_atts = has_filter( 'pdb-' . $this->name . '_selector_option_attribute_list' );
 
-    foreach ( $this->_make_assoc( $this->options ) as $title => $value ) 
+    foreach ( $this->make_assoc( $this->options ) as $title => $value ) 
     {
       $title = Participants_Db::apply_filters( 'translate_string', $title );
 
@@ -1822,14 +1830,13 @@ backtrace: '.print_r( wp_debug_backtrace_summary(),1));
    */
   public static function is_assoc( $array )
   {
-    //$assoc = is_array( $array ) && count( array_filter( array_keys( $array ), function ($k) { return is_string($k); } ) ) === count( $array );
-    $assoc = false;
-    foreach ( $array as $k => $v ) {
-      if ( is_string( $k ) && $k != $v ) {
-        $assoc = true;
-      }
+    if ( function_exists( 'array_is_list' ) )
+    {
+      return array_is_list($array) === false;
     }
-    return $assoc;
+    
+    // returns true if there are any string keys in the array
+    return count(array_filter(array_keys($array), 'is_string')) > 0;
   }
 
   /**
@@ -1849,7 +1856,7 @@ backtrace: '.print_r( wp_debug_backtrace_summary(),1));
    * @param array the array to be processed
    * @return array an associative array
    */
-  protected function _make_assoc( $array )
+  protected function make_assoc( $array )
   {
     if ( self::is_assoc( $array ) )
       return $array;

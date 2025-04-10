@@ -8,7 +8,7 @@
  * @author     Roland Barker <webdesign@xnau.com>
  * @copyright  2021  xnau webdesign
  * @license    GPL3
- * @version    2.2
+ * @version    2.4
  * @link       http://xnau.com/wordpress-plugins/
  * @depends    
  */
@@ -52,16 +52,11 @@ class process extends \WP_Background_Process {
    * sets up the store class
    * 
    * @param array $column_names
-   * @param string $match_mode
-   * @param string $match_field
+   * @param array $preferences
    */
-  public function setup( $column_names, $match_mode, $match_field )
+  public function setup( $column_names, $preferences )
   {
-    set_transient( self::setting, array(
-        'column_names' => $column_names,
-        'match_mode' => $match_mode,
-        'match_field' => $match_field
-    ));
+    set_transient( self::setting, ['column_names' => $column_names] + $preferences );
   }
 
 	/**
@@ -77,6 +72,16 @@ class process extends \WP_Background_Process {
 		if ( ! empty( $this->data ) ) {
 			update_site_option( $key, $this->data );
 		}
+    
+    // store the queue length
+    tally::set_import_length( $this->queue_count() );
+    
+    /**
+     * @action pdb-import_queue_saved
+     * 
+     * fired when the queue is complete and processing begins
+     */
+    do_action( 'pdb-import_queue_saved', $this );
 
 		return $this;
 	}
@@ -88,7 +93,20 @@ class process extends \WP_Background_Process {
    */
   protected function task( $line )
   {
-    $this->import( $line, $this->settings() );
+    $ts = microtime(true);
+    
+    $preferences = $this->settings();
+    
+    if ( $this->is_background_import() && isset($preferences['blank_overwrite']) && boolval( $preferences['blank_overwrite'] ) )
+    {
+      add_filter( 'pdb-allow_imported_empty_value_overwrite', '__return_true', 5 );
+    }
+    
+    $this->import( $line, $preferences );
+    
+    $ms = round( ( microtime(true) - $ts ) * 1000 );
+    
+//    error_log(__METHOD__.' elapsed: ' . $ms . 'μs' );
     
     return false;
   }
@@ -96,15 +114,40 @@ class process extends \WP_Background_Process {
   /**
    * adds the data to the queue
    * 
+   * if background import is disabled, imports the data line immediately
+   * 
    * @param array $line CSV data line
    */
   public function push_to_queue( $line )
   {
-    if ( \Participants_Db::plugin_setting_is_true( 'background_import', true ) ) {
+    if ( $this->is_background_import() ) 
+    {
       parent::push_to_queue($line);
-    } else {
+    } 
+    else 
+    {
       $this->task( $line );
     }
+  }
+  
+  /**
+   * tells the number of items in the queue
+   * 
+   * @return int
+   */
+  public function queue_count()
+  {
+    return count( $this->data );
+  }
+  
+  /**
+   * tells if beckground imports is enabled
+   * 
+   * @return bool
+   */
+  private function is_background_import()
+  {
+    return \Participants_Db::plugin_setting_is_true( 'background_import', true );
   }
   
   /**
@@ -141,8 +184,6 @@ class process extends \WP_Background_Process {
   {
     parent::complete();
     
-    tally::get_instance()->complete( true );
-    
     /**
      * @see xnau_CSV_Import::__construct for another import complete action
      */
@@ -156,9 +197,9 @@ class process extends \WP_Background_Process {
 	 *
 	 * @return $this
 	 */
-	public function delete( $key ) {
-    
-   \Participants_Db::debug_log( __METHOD__.' deleting: ' . $key, 2 );
+	public function delete( $key )
+  {
+    do_action('pdb-import_process_delete_queue', $this );
     
 		delete_site_option( $key );
 

@@ -8,7 +8,7 @@
  * @author     Roland Barker <webdesign@xnau.com>
  * @copyright  2021  xnau webdesign
  * @license    GPL3
- * @version    0.2
+ * @version    1.3
  * @link       http://xnau.com/wordpress-plugins/
  * @depends    
  */
@@ -58,6 +58,11 @@ abstract class base_query {
    * @var PDb_submission\main_query\base_query
    */
   private static $instance;
+  
+  /**
+   * @var string a context label
+   */
+  private $context = '';
 
   /**
    * provides a class instance
@@ -66,12 +71,13 @@ abstract class base_query {
    * @param array $post
    * @param int $record_id
    * @param bool $func_call true if the submission is a function call
+   * @param string $context label
    * @return PDb_submission\main_query\base_query
    */
-  public static function get_instance( $type, $post, $record_id, $func_call )
+  public static function get_instance( $type, $post, $record_id, $func_call, $context = '' )
   {
     $class = "\PDb_submission\main_query\\{$type}_query";
-    self::$instance = new $class( $post, $record_id, $func_call );
+    self::$instance = new $class( $post, $record_id, $func_call, $context );
 
     return self::$instance;
   }
@@ -90,13 +96,15 @@ abstract class base_query {
    * @param array $post
    * @param int $record_id
    * @param bool $func_call true if getting called by a function instead of a form submission
+   * @param string $context label
    */
-  public function __construct( $post, $record_id, $func_call )
+  public function __construct( $post, $record_id, $func_call, $context = '' )
   {
     $this->post = $post;
     $this->record_id = $record_id;
     $this->is_import = self::is_csv_import() || isset( $post['csv_file_upload'] );
     $this->is_func_call = $func_call;
+    $this->context = $context;
   }
 
   /**
@@ -180,6 +188,16 @@ abstract class base_query {
   {
     return count( $this->column_clauses );
   }
+  
+  /**
+   * provides the current context label
+   * 
+   * @return string
+   */
+  public function context()
+  {
+    return $this->context;
+  }
 
   /**
    * provides the data body of the query
@@ -192,7 +210,7 @@ abstract class base_query {
   }
 
   /**
-   * provides the query header
+   * provides the query where clauses
    * 
    * @return string
    */
@@ -226,14 +244,14 @@ abstract class base_query {
 
     // run the query
     $result = $wpdb->query( $this->sanitized_query() );
-
+    
     if ( $result === false )
     {
-      PDB::debug_log( __METHOD__ . ' record store error: ' . $wpdb->last_error . ' for query: '.$wpdb->last_query );
+      PDB::debug_log( __METHOD__ . ' record store error: ' . $wpdb->last_error . ' for query: '. $wpdb->last_query . $this->context_note() );
     } 
     elseif ( $result > 0 )
     {
-      PDB::debug_log( __METHOD__ . ' storing record: ' . $wpdb->last_query );
+      PDB::debug_log( __METHOD__ . ' storing record: ' . $wpdb->last_query . $this->context_note() );
     }
 
     $db_error_message = '';
@@ -242,6 +260,7 @@ abstract class base_query {
       if ( !$this->is_import && !$this->is_func_call ) {
         $db_error_message = sprintf( PDB::$i18n[ 'zero_rows_error' ], $wpdb->last_query );
       }
+      
       PDB::$insert_status = 'skip';
     }
     elseif ( $result === false )
@@ -275,7 +294,7 @@ abstract class base_query {
      */
     if ( PDB::is_admin() )
     {
-      if ( !$this->is_import && !$this->is_func_call && $result )
+      if ( !$this->is_import && !$this->is_func_call && $result > 0 )
       {
         PDB::set_admin_message( ($this->query_mode() === 'insert' ? PDB::$i18n[ 'added' ] : PDB::$i18n[ 'updated' ] ), 'updated' );
       }
@@ -467,6 +486,18 @@ abstract class base_query {
     }
 
     return $query;
+  }
+  
+  /**
+   * provides the context string
+   * 
+   * @param string $prepend options prepend string
+   * @return string
+   */
+  protected function context_note( $prepend = false )
+  {
+    $prepend = $prepend === false ? 'in context' : $prepend;
+    return empty( $this->context ) ? '' : ' ' . $prepend . ' "' . $this->context . '"';
   }
 
 }

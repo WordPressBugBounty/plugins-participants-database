@@ -2,14 +2,9 @@
 /**
  * plugin settings handler class
  *
- * uses the WP Settings API to manage settings, interactions with settings,
- * display and editing of settings for a plugin. It would normally be extended
- * by a plugin-specific subclass where the specific settings would be defined.
- * This class is designed to be a simple implementation, not suitable for
- * plugins requiring a more complex settings scheme, such as multiple pages. It
- * will work well with Javascript tabs, however.
+ * uses the WP Settings API to manage settings,
  *
- * @version 1.4
+ * @version 1.5
  *
  * @depends xnau_FormElement class
  */
@@ -18,41 +13,73 @@ if ( !defined( 'ABSPATH' ) )
 
 class xnau_Plugin_Settings {
 
-  // class name of the plugin-specific subclass
+  /**
+   * 
+   * @var string class name of the plugin-specific subclass
+   */
   private $plugin_class;
-  // WP settings label
+  
+  /**
+   * @var string WP settings label
+   */
   protected $WP_setting;
-  // all registered sections
+  
+  /**
+   * 
+   * @var array all registered sections
+   */
   protected $sections;
-  // descriptions for each section as needed;
+  
+  /**
+   * 
+   * @var array descriptions for each section as needed;
+   */
   protected $section_description;
-  // all individual settings
+  
+  /**
+   * 
+   * @var array all individual settings
+   */
   protected $plugin_settings;
-  // settings page slug
+  
+  /**
+   * 
+   * @var string settings page slug
+   */
   protected $settings_page;
-  // help text wrap HTML
+  
+  /**
+   * 
+   * @var string help text wrap HTML sprintf pattern
+   */
   protected $help_text_wrap;
-  // wrapper HTML for the settings page submit button
+  
+  /**
+   * 
+   * @var type wrapper HTML for the settings page submit button sprintf pattern
+   */
   protected $submit_wrap;
-  // classname for the submit button
+  
+  /**
+   * 
+   * @var string classname for the submit button
+   */
   protected $submit_class;
-  // label for the submit button
+  
+  /**
+   * 
+   * @var string label for the submit button
+   */
   protected $submit_button;
 
   /**
-   * name of the option storing a running option version number
+   * 
+   * @var string name of the option storing a running option version number
    * 
    * this is incremented every time the options are saved so that the includes can 
    * be given a new version number
-   * 
-   * @var string
    */
-  var $option_version_location;
-
-  /**
-   * @var string type to use for text area settings; rich or plain text
-   */
-  var $textarea_type = 'text-area';
+  public $option_version_location;
 
   /**
    * constructor
@@ -95,6 +122,13 @@ class xnau_Plugin_Settings {
     // register the plugin setting with WP
     // this will store an array of all the individual settings for the plugin
     register_setting( $this->WP_setting, $this->WP_setting, $this->register_setting_args() );
+    
+    add_filter('pre_update_option_' . $this->WP_setting, [$this,'check_option_update'], 10, 2);
+    
+    if ( defined( 'PDB_DEBUG' ) && PDB_DEBUG )
+    {
+      add_action('update_option_' . $this->WP_setting, [$this,'log_option_update'], 10, 2);
+    }
   }
   
   /**
@@ -137,20 +171,26 @@ class xnau_Plugin_Settings {
    * @param string  $option_name name of the option to update
    * @param string  $value value to use
    * @param bool    $overwrite if true, overwrite the value, false to write vlaue only if not present
+   * @return bool true if the option was updated
    */
   public function update_option( $option_name, $value, $overwrite = true )
   {
-
     if ( !isset( $option_name ) )
+    {
       return false;
+    }
 
     $options = get_option( $this->WP_setting );
 
-    if ( false === $overwrite && isset( $options[$option_name] ) ) {
+    if ( false === $overwrite && isset( $options[$option_name] ) )
+    {
       return true;
-    } else {
+    } 
+    else 
+    {
       $options[$option_name] = $value;
     }
+    
 
     return update_option( $this->WP_setting, $options );
   }
@@ -183,6 +223,9 @@ class xnau_Plugin_Settings {
     return get_option( $this->option_version_location, '0.0' );
   }
 
+  /**
+   * 
+   */
   protected function increment_option_version()
   {
     $version = get_option( $this->option_version_location, '0.0' );
@@ -191,10 +234,6 @@ class xnau_Plugin_Settings {
 
     update_option( $this->option_version_location, $new_version );
   }
-
-  /*   * *****************
-   * METHODS CALLED BY PLUGIN SUBCLASS
-   */
 
   /**
    * defines the individual settings for the plugin
@@ -461,19 +500,89 @@ class xnau_Plugin_Settings {
      */
     private function _register_option( $name, $title, $group, $options )
     {
-
       if ( !isset( $options['type'] ) )
+      {
         $options['type'] = 'text';
+      }
+      
       $options['name'] = $name;
       $options['title'] = $title;
 
       add_settings_field(
-              $name, $title, array($this, 'print_settings_field'), $this->settings_page, $this->WP_setting . '_' . $group, $options
+              $name, $title, [$this, 'print_settings_field'], $this->settings_page, $this->WP_setting . '_' . $group, $options
       );
 
       // drop in the default value (if any)
-      if ( isset( $options['value'] ) )
-        self::update_option( $name, $options['value'], false );
+      if ( isset( $options['value'] ) ) 
+      {
+        $this->update_option( $name, $options['value'], false );
+      }
+    }
+    
+    
+    /**
+     * checks the update to the plugin settings
+     * 
+     * this is to provide notice that there were no changes in the settings save
+     * 
+     * @param array $new_options
+     * @param array $previous_options
+     */
+    public function check_option_update( $new_options, $previous_options )
+    {
+      $changes = array_diff_assoc($new_options, $previous_options);
+      
+      if ( empty( $changes ) )
+      {
+        add_settings_error( $this->WP_setting, 'settings_updated', __( 'No settings changes were saved.', 'participants-database' ), 'info' );
+      }
+      
+      return $new_options;
+    }
+    
+    /**
+     * logs an update to the plugin settings
+     * 
+     * this is only called when plugin debugging is enabled
+     * 
+     * @global \wpdb $wpdb
+     * @param array $previous_options
+     * @param array $current_options
+     */
+    public function log_option_update( $previous_options, $current_options )
+    {
+      global $wpdb;
+      
+      if ( ! empty( $wpdb->last_error ) )
+      {
+        Participants_Db::debug_log( __METHOD__.' db error: '. $wpdb->last_error );
+      }
+      
+      $changes = array_diff_assoc($current_options, $previous_options);
+      
+      if ( empty( $changes ) )
+      {
+        Participants_Db::debug_log( __METHOD__.'settings update: no changes saved' );
+      }
+      else
+      {
+        $pattern = 'option: "%s" old value: "%s"  new value: "%s"';
+        $log_messages = [];
+
+        foreach ( $changes as $option => $new_value ) 
+        {
+          $log_messages[$option] = [$previous_options[$option], $new_value];
+        }
+        
+        // set up the settings array
+        $this->_define_settings();
+        
+        foreach( $log_messages as $option => $values )
+        {
+          $message = 'PDB setting update: ' . sprintf( $pattern, $this->get_option_title( $option ), $values[0], $values[1] );
+          Participants_Db::debug_log( $message );
+        }
+      }
     }
 
   }
