@@ -405,11 +405,8 @@ abstract class calculated_field extends dynamic_db_field {
     
     foreach( $this->template->field_list() as $fieldname )
     {
-      $test_fieldname = str_replace( ['value:'],'',$fieldname);
-      
-      if( \PDb_Form_Field_Def::is_field( $test_fieldname ) ) 
-      {
-        $list[] = $test_fieldname;
+      if( \PDb_Form_Field_Def::is_field( $fieldname ) ) {
+        $list[] = $fieldname;
       }
     }
     

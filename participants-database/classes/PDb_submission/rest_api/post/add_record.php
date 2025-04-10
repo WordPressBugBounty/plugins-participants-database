@@ -50,7 +50,7 @@ class add_record extends \PDb_submission\rest_api\post_request {
   }
   
   /**
-   * pass the data through the pdb-before_submit_add filter
+   * pass the data through the pdb-before_submit_update filter
    * 
    * this also triggers updates to dynamic fields
    * 
