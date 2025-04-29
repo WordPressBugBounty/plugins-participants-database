@@ -4,7 +4,7 @@
  * Plugin URI: https://xnau.com/wordpress-plugins/participants-database
  * Description: Plugin for managing a database of participants, members or volunteers
  * Author: Roland Barker, xnau webdesign
- * Version: 2.7.2
+ * Version: 2.7.3
  * Author URI: https://xnau.com
  * License: GPL3
  * Text Domain: participants-database
@@ -119,7 +119,7 @@ class Participants_Db extends PDb_Base {
    * name of the WP plugin options
    * @var string
    */
-  public static $participants_db_options;
+  public static $participants_db_options = self::PLUGIN_NAME . '_options';
 
   /**
    * name of the default settings option
@@ -311,9 +311,7 @@ class Participants_Db extends PDb_Base {
     // set the WP hooks to finish setting up the plugin
     add_action( 'plugins_loaded', array(__CLASS__, 'setup_source_names'), 1 );
     add_action( 'plugins_loaded', array(__CLASS__, 'init'), 5 );
-    add_action('init', function(){
-      self::load_plugin_textdomain( __FILE__ );
-    });
+    add_action('init', [ __CLASS__,'setup_translations'] );
     add_action( 'wp', array(__CLASS__, 'check_for_shortcode'), 1 );
     add_action( 'wp', array(__CLASS__, 'remove_rel_link') );
 
@@ -379,15 +377,7 @@ class Participants_Db extends PDb_Base {
     add_action( 'wp_ajax_' . PDb_Manage_List_Columns::action, 'PDb_Manage_List_Columns::process_request' );
     
     // register some plugin events
-    add_filter( 'pdb-register_global_event', function ($events){
-      
-      $events['pdb-view_single_record'] = __( 'View Single Record', 'participants-database' );
-      $events['pdb-open_record_edit'] = __( 'Open Edit Record Form', 'participants-database' );
-      $events['pdb-record_accessed_using_private_link'] = __( 'Record Accessed with Private Link', 'participants-database' );
-      $events['pdb-first_time_record_access_with_private_link'] = __( 'Record Accessed First Time with Private Link', 'participants-database' );
-      
-      return $events;
-    });
+    add_filter( 'pdb-register_global_event', [ __CLASS__,'register_events']);
     
     if ( ! function_exists( 'deactivate_plugins' ) ) {
       include_once ABSPATH . '/wp-admin/includes/plugin.php';
@@ -488,9 +478,6 @@ class Participants_Db extends PDb_Base {
    */
   public static function setup_source_names()
   {
-//    if ( !is_null( self::$participants_table ) ) {
-//      return;
-//    }
     /*
      * these can be modified later with a filter hook
      * 
@@ -554,9 +541,23 @@ class Participants_Db extends PDb_Base {
       new \PDb_import\import_status_display();
     }
   }
+  
+  /**
+   * sets up the initial translations
+   */
+  public static function setup_translations()
+  {
+    self::load_plugin_textdomain( __FILE__ );
+    
+    self::$plugin_title = self::apply_filters( 'plugin_title', __( 'Participants Database', 'participants-database' ) );
+
+    self::_set_i18n();
+  }
 
   /**
-   * initializes the plugin in the WP environment, fired on the 'plugins_loaded' hook
+   * initializes the plugin in the WP environment
+   * 
+   * fired on the 'plugins_loaded' hook
    * 
    * @return null
    */
@@ -585,9 +586,7 @@ class Participants_Db extends PDb_Base {
      */
     new \PDb_import\controller();
 
-    self::$plugin_title = self::apply_filters( 'plugin_title', __( 'Participants Database', 'participants-database' ) );
-
-    self::_set_i18n();
+    self::$plugin_title = 'Participants Database';
     /**
      * @version 1.6 filter pdb-private_id_length
      */
@@ -908,6 +907,40 @@ class Participants_Db extends PDb_Base {
 
       include $file;
     }
+  }
+  
+  /**
+   * registers this plugin's global events
+   * 
+   * @param array $events
+   * @return array
+   */
+  public static function register_events( $events )
+  {
+    add_filter( 'pdb-translate_event_titles', [ __CLASS__,'translate_event_titles'] );
+    
+    $events['pdb-view_single_record'] = 'View Single Record';
+    $events['pdb-open_record_edit'] = 'Open Edit Record Form';
+    $events['pdb-record_accessed_using_private_link'] = 'Record Accessed with Private Link';
+    $events['pdb-first_time_record_access_with_private_link'] = 'Record Accessed First Time with Private Link';
+
+    return $events;
+  }
+  
+  /**
+   * provides the translated titles for the registered events
+   * 
+   * @param array $events
+   * @return array
+   */
+  public static function translate_event_titles( $events )
+  {
+    $events['pdb-view_single_record'] = __( 'View Single Record', 'participants-database' );
+    $events['pdb-open_record_edit'] = __( 'Open Edit Record Form', 'participants-database' );
+    $events['pdb-record_accessed_using_private_link'] = __( 'Record Accessed with Private Link', 'participants-database' );
+    $events['pdb-first_time_record_access_with_private_link'] = __( 'Record Accessed First Time with Private Link', 'participants-database' );
+
+    return $events;
   }
 
   /**
@@ -1660,6 +1693,28 @@ class Participants_Db extends PDb_Base {
     
     // get the record id to use in the query
     $record_id = $record_match->record_id();
+    
+    // check the captcha if present before going any further
+    $captcha_field = '';
+    
+    if ( PDb_CAPTCHA::captcha_field_name( $column_names ) )
+    {
+      $captcha_field = PDb_CAPTCHA::captcha_field_name( array_keys( $post ) );
+
+      if ( false === $captcha_field )
+      {
+        // captcha field was expected but missing
+        return false;
+      }
+
+      self::$validation_errors->validate( self::deep_stripslashes( $post[$captcha_field] ), self::$fields[$captcha_field], $post, $record_id );
+
+      if ( self::$validation_errors->errors_exist() )
+      {
+        // captcha didn't validate
+        return false;
+      }
+    }
 
     /*
      * upload any files included in the form submission
@@ -1694,8 +1749,12 @@ class Participants_Db extends PDb_Base {
       
       $field = PDb_submission\main_query\columns::get_column_object( $column, $main_query->column_value( $column->name ) );
 
-      if ( $column_names === false || in_array( $column->name, $column_names ) ) 
-      { // only validate submitted values #2956 or all fields are submitted
+      /*
+       * if $column_names is false, validate all fields except the captcha field which has already been validated
+       * if $column_nmaes is an array, only validate fields that are in that array except the captcha field
+       */
+      if ( ( $column_names === false || in_array( $column->name, $column_names ) ) && $column->name !== $captcha_field ) 
+      { 
         $main_query->validate_column( $field, $column );
       }
       
@@ -3281,9 +3340,13 @@ class Participants_Db extends PDb_Base {
   private static function _show_validation_error( $error, $name = '', $overwrite = true )
   {
     if ( is_object( self::$validation_errors ) )
+    {
       self::$validation_errors->add_error( $name, $error, $overwrite );
+    }
     else
+    {
       self::set_admin_message( $error );
+    }
   }
 
   /**
@@ -3291,7 +3354,7 @@ class Participants_Db extends PDb_Base {
    */
   private static function _set_i18n()
   {
-    self::$i18n = array(
+    self::$i18n = [
         'submit' => __( 'Submit', 'participants-database' ),
         'apply' => __( 'Apply', 'participants-database' ),
         'next' => __( 'Next', 'participants-database' ),
@@ -3301,7 +3364,7 @@ class Participants_Db extends PDb_Base {
         'added' => __( 'The new record has been added.', 'participants-database' ),
         'zero_rows_error' => __( 'No record was added on query: %s', 'participants-database' ),
         'database_error' => __( 'Database Error: %2$s on query: %1$s', 'participants-database' )
-    );
+    ];
   }
 
   /**
