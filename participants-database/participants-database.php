@@ -4,7 +4,7 @@
  * Plugin URI: https://xnau.com/wordpress-plugins/participants-database
  * Description: Plugin for managing a database of participants, members or volunteers
  * Author: Roland Barker, xnau webdesign
- * Version: 2.7.5.1
+ * Version: 2.7.6
  * Author URI: https://xnau.com
  * License: GPL3
  * Text Domain: participants-database
@@ -638,12 +638,12 @@ class Participants_Db extends PDb_Base {
    */
   public static function register_assets()
   {
-    $presuffix = self::use_minified_assets() ? '.min' : '';
+    $min = self::use_minified_assets() ? '.min' : '';
     
     /*
      * register frontend scripts and stylesheets
      */
-    wp_register_style( self::$prefix . 'frontend', plugins_url( "/css/participants-database$presuffix.css", __FILE__ ), array('dashicons'), '1.7.3' );
+    wp_register_style( self::$prefix . 'frontend', plugins_url( "/css/participants-database$min.css", __FILE__ ), array('dashicons'), '1.8.3' );
     
     if ( self::_set_custom_css() ) {
       wp_register_style( 'custom_plugin_css', plugins_url( '/css/' . 'PDb-custom.css', __FILE__ ), null, self::$Settings->option_version() );
@@ -655,12 +655,12 @@ class Participants_Db extends PDb_Base {
     
     wp_add_inline_style(self::$prefix . 'frontend', self::inline_css() );
 
-    wp_register_script( self::$prefix . 'shortcode', self::asset_url( "js/shortcodes$presuffix.js" ), array('jquery'), '1.2' );
+    wp_register_script( self::$prefix . 'shortcode', self::asset_url( "js/shortcodes$min.js" ), array('jquery'), '1.2' );
 
-    wp_register_script( self::$prefix . 'list-filter', self::asset_url( "js/list-filter$presuffix.js" ), array('jquery'), '2.0' );
+    wp_register_script( self::$prefix . 'list-filter', self::asset_url( "js/list-filter$min.js" ), array('jquery'), '2.0' );
     wp_add_inline_script( self::$prefix . 'list-filter', self::inline_js_data( 'PDb_ajax', PDb_List::ajax_params() ), false );
     
-    wp_register_script( self::$prefix . 'otherselect', self::asset_url( "js/otherselect$presuffix.js" ), array('jquery'), '0.6' );
+    wp_register_script( self::$prefix . 'otherselect', self::asset_url( "js/otherselect$min.js" ), array('jquery'), '0.6' );
   }
 
   /**
@@ -3252,9 +3252,96 @@ class Participants_Db extends PDb_Base {
 .pdb-list .image-field-wrap img {
    height:' . self::css_dimension_value( self::plugin_setting( 'list_default_image_size', '50px' ) ) . ';
    max-width: inherit;
-}';
+}
+'. self::inline_css_custom_props();
   }
+  
+  /**
+   * prints a custom CSS property value declaration
+   * 
+   * @param array $property_values
+   */
+  private static function inline_css_custom_props()
+  {
+    $inline = '';
+    $p_selector = "%s {\n%s\n}\n";
+    $p_rule = '   --PDb-%s: %s; ';
+    $css = [];
+    $rule_list = [];
 
+    foreach( self::css_custom_props() as $propname => $value )
+    {
+      if ( $value )
+      {
+        $rule_list[] = sprintf( $p_rule, $propname, $value );
+      }
+    }
+
+    if ( ! empty( $rule_list ) )
+    {
+      $css[] = sprintf( $p_selector, ':root', implode( PHP_EOL, $rule_list ) );
+    }
+    
+    if ( ! empty( $css ) )
+    {
+      $inline = implode( PHP_EOL, $css );
+    }
+    
+    return $inline;
+  }
+  
+  /**
+   * provides an array of custom CSS property values
+   * 
+   * @return array as $propname => $value
+   */
+  private static function css_custom_props()
+  {
+    $custom_props = [];
+    
+    $color_mode = [
+      'default' => [
+          'pagination-border-color' => 'rgba(204, 204, 204, 1)',
+          'pagination-hover-color' => '#CCC',
+          'pagination-bg'=> '#FAFAFA',
+          'pagination-current-bg' => 'rgba(204, 204, 204, 1)',
+          'pagination-current-color' => '#FFF',
+          'pagination-disabled-bg' => '#F3F3F3',
+          'pagination-disabled-color' => '#777',
+          'message-bg' => '#FFF',
+          'message-shadow' => '0 1px 1px 0 rgba(0, 0, 0, 0.1)',
+          'flex-row-bg' => 'rgba(0,0,0,0.05)',
+      ],
+      'dark' => [
+          'pagination-border-color' => 'rgba(255,255,255,0.2)',
+          'pagination-hover-color' => 'rgba(255,255,255,0.5)',
+          'pagination-bg'=> 'rgba( 255,255,255,0.1)',
+          'pagination-current-bg' => 'rgba(255, 255, 255, 0.5)',
+          'pagination-current-color' => false,
+          'pagination-disabled-bg' => false,
+          'pagination-disabled-color' => 'rgba(255,255,255,0.4)',
+          'message-bg' => 'rgba(255,255,255,0.3)',
+          'message-shadow' => '1px 1px 3px 0 rgba(0, 0, 0, 0.3)',
+          'flex-row-bg' => 'rgba(255,255,255,0.05)',
+      ],
+      'light' => [
+          'pagination-border-color' => 'rgba(0,0,0,0.2)',
+          'pagination-hover-color' => 'rgba(0,0,0,0.5)',
+          'pagination-bg' => 'rgba( 0,0,0,0.1)',
+          'pagination-current-bg' => 'rgba(0,0,0, 0.2)',
+          'pagination-current-color' => false,
+          'pagination-disabled-bg' => false,
+          'pagination-disabled-color' => 'rgba(0,0,0,0.2)',
+          'message-bg' => 'rgba(0,0,0,0.1)',
+          'message-shadow' => '1px 1px 1px 0 rgba(255, 255, 255, 0.3)',
+          'flex-row-bg' => 'rgba(0,0,0,0.05)',
+      ]
+    ];
+    
+    $custom_props += $color_mode[ self::plugin_setting('color_mode', 'default')];
+    
+    return self::apply_filters('css_custom_properties', $custom_props );
+  }
   /**
    * provides the list output from an AJAX search
    * 
@@ -3468,9 +3555,11 @@ class Participants_Db extends PDb_Base {
     );
     /**
      * this registers the edit participant page without adding it as a menu item
+     * 
+     * had to change how this is done for php 8.2
      */
     add_submenu_page(
-            '', null, null, self::plugin_capability( 'record_edit_capability', 'edit participant' ), self::$plugin_page . '-edit_participant', array(__CLASS__, 'include_admin_file')
+            self::$plugin_page . '-add_participant', '', '', self::plugin_capability( 'record_edit_capability', 'edit participant' ), self::$plugin_page . '-edit_participant', array(__CLASS__, 'include_admin_file')
     );
 
     add_submenu_page(
