@@ -4,7 +4,7 @@
  * Plugin URI: https://xnau.com/wordpress-plugins/participants-database
  * Description: Plugin for managing a database of participants, members or volunteers
  * Author: Roland Barker, xnau webdesign
- * Version: 2.7.6.2
+ * Version: 2.7.6.3
  * Author URI: https://xnau.com
  * License: GPL3
  * Text Domain: participants-database
@@ -723,7 +723,7 @@ class Participants_Db extends PDb_Base {
     wp_register_script( 'jq-doublescroll', self::asset_url( "js/jquery.doubleScroll$min.js" ), array('jquery', 'jquery-ui-widget') );
     wp_register_script( self::$prefix . 'admin', self::asset_url( "js/admin$min.js" ), array('jquery', 'jq-doublescroll', 'jquery-ui-sortable', self::$prefix . 'cookie', 'jquery-ui-dialog' ), self::$plugin_version );
     wp_register_script( self::$prefix . 'otherselect', self::asset_url( "js/otherselect$min.js" ), array('jquery') );
-    wp_register_script( self::$prefix . 'list-admin', self::asset_url( "js/list_admin$min.js" ), array('jquery', 'jquery-ui-dialog'), self::$plugin_version . '.3' );
+    wp_register_script( self::$prefix . 'list-admin', self::asset_url( "js/list_admin$min.js" ), array('jquery', 'jquery-ui-dialog'), '1.5.2' );
     wp_register_script( self::$prefix . 'aux_plugin_settings_tabs', self::asset_url( "/js/aux_plugin_settings$min.js" ), array('jquery', 'jquery-ui-tabs', self::$prefix . 'admin', /*self::$prefix . 'jq-placeholder',*/ self::$prefix . 'cookie'), self::$plugin_version );
     wp_register_script( self::$prefix . 'debounce', plugins_url( 'js/jq_debounce.js', __FILE__ ), array('jquery') );
     wp_register_script( self::$prefix . 'admin-notices', self::asset_url( "js/pdb_admin_notices$min.js" ), array('jquery'), self::$plugin_version );
