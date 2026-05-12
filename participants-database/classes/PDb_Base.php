@@ -2020,8 +2020,8 @@ return $field->name() === $fieldname;
    */
   public static function delete_file( $filename )
   {
-    // strip out file path so plugin can set the path to its own asset location #3286
-    $asset_filename = basename( $filename );
+    // sanitize the value to only point to plugin upload assets #3286
+    $asset_filename = PDb_Path::asset_path( basename( $filename ) );
 
     /**
      * provides a way to override the delete method: if the filter returns bool 
@@ -2041,7 +2041,6 @@ return $field->name() === $fieldname;
       $result = @unlink( $asset_filename ); // delete the file
       chdir( $current_dir ); // change back to the previous directory
     }
-    
     return $result;
   }
 
